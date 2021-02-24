@@ -1,0 +1,22 @@
+{
+  "name": "tetris-like-game",
+  "version": "0.0.1",
+  "description": "Base for Tetris-like bllock game. Draft demo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "demo"
+  ],
+  "author": "Evgeniy Vinokurov",
+  "license": "ISC",
+  "dependencies": {
+    "gulp": "^4.0.2",
+    "gulp-cli": "^2.2.0",
+    "gulp-concat": "^2.6.1",
+    "gulp-sass": "^4.0.2",
+    "jquery": "^3.3.1",
+    "sass.js": "^0.11.1"
+  }
+}
