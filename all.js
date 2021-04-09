@@ -114,6 +114,10 @@ Tetris = function(){
 						weight++;
 					}
 
+					if (j == (je - 1) && !firstXtremums[i]) {
+						firstXtremums[i] = je;
+					}
+
 					if(exit) { break };
 				}
 
@@ -367,7 +371,7 @@ Tetris = function(){
 		    	
 				ctx.fillStyle = "green";
 
-				if (fi.array[x][y].color != "#FFFFFF") {
+				if (fi.array[x][y].color != "#FFFFFF" || matrix.array[fi.coordinates[0] + x][fi.coordinates[1] + y].color != "#FFFFFF") {
 					ctx.fillStyle = "white";
 				}
 
