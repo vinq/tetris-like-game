@@ -9,7 +9,8 @@ Random.getRandomArbitrary = function(min, max) {
 }
 
 Random.getRandomCenter = function(matrix, figureDimentions){
-	return [Math.ceil(Random.getRandomArbitrary(0, matrix.dimentions[0] - 2 - figureDimentions[0])), Math.ceil(matrix.dimentions[1] / 2)];
+	var randomFrom = 0, randomTo = matrix.dimentions[0] - 2 - figureDimentions[0];
+	return [Math.ceil(Random.getRandomArbitrary(randomFrom, randomTo)), 0];
 }
 
 Logger = {};

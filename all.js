@@ -12,7 +12,8 @@ Random.getRandomArbitrary = function(min, max) {
 }
 
 Random.getRandomCenter = function(matrix, figureDimentions){
-	return [Math.ceil(Random.getRandomArbitrary(0, matrix.dimentions[0] - 2 - figureDimentions[0])), Math.ceil(matrix.dimentions[1] / 2)];
+	var randomFrom = 0, randomTo = matrix.dimentions[0] - 2 - figureDimentions[0];
+	return [Math.ceil(Random.getRandomArbitrary(randomFrom, randomTo)), 0];
 }
 
 Logger = {};
@@ -24,10 +25,70 @@ Logger.log = function(layer, vars){
 }
 
 jQuery(document).ready(function ($) {
-	var t = new Tetris();
+
+	// Control Panel 
+
+	var speedControl = $("input[type='range'][name='speed']");
+	var xFigureControl = $("input[type='range'][name='xfigure']");
+	var yFigureControl = $("input[type='range'][name='yfigure']");
+	var xMatrixControl = $("input[type='range'][name='xmatrix']");
+	var yMatrixControl = $("input[type='range'][name='ymatrix']");
+	var cellSizeControl = $("input[type='range'][name='cellsize']");
+	var numberControl = $("input[type='submit'][name='number']");
+
+	var sizesTimeout = null, sizesMTimeout = null;
+	
+	// Init Tetris
+	var t = new Tetris(speedControl.val(), [xMatrixControl.val(), yMatrixControl.val()], [xFigureControl.val(), yFigureControl.val()], cellSizeControl.val());
+
+	// Control Panel Events and functions
+
+	var changeSizes = function(){
+		t.setFigureSizes([xFigureControl.val(), yFigureControl.val()]);
+	}	
+
+	var changeMatrixSizes = function(){
+		t.stop();
+		t = new Tetris(speedControl.val(), [xMatrixControl.val(), yMatrixControl.val()], [xFigureControl.val(), yFigureControl.val()], cellSizeControl.val());
+	}
+
+
+	speedControl.on("change", function(){
+		let newSpeed = speedControl.val();
+		t.setSpeed(newSpeed);
+	})
+
+	numberControl.on("click", function(){
+		t.more();
+	})
+
+	cellSizeControl.on("change", function(){
+		let size = cellSizeControl.val();
+		t.setCellSize(size);
+	})
+
+	xFigureControl.on("change", function(){
+		clearTimeout(sizesTimeout);
+		sizesTimeout = setTimeout(changeSizes, 2000);
+	})
+
+	yFigureControl.on("change", function(){
+		clearTimeout(sizesTimeout);
+		sizesTimeout = setTimeout(changeSizes, 2000);
+	})
+
+	xMatrixControl.on("change", function(){
+		clearTimeout(sizesTimeout);
+		sizesMTimeout = setTimeout(changeMatrixSizes, 2000);
+	})
+
+	yMatrixControl.on("change", function(){
+		clearTimeout(sizesTimeout);
+		sizesMTimeout = setTimeout(changeMatrixSizes, 2000);
+	})
 });
 
-Tetris = function(){
+Tetris = function(speed, matrixSize, figureSize, cellSize){
 	var selfTetris = this;
 
 	this.Cell = function(color, position) {
@@ -35,7 +96,7 @@ Tetris = function(){
 		this.position = position;
 	}
 
-	this.Figure = function(dimentions, coordinates, colors, cellSize, empty = false, cb = function(){}, matrix){
+	this.Figure = function(dimentions, coordinates, colors, empty = false, matrix){
 
 		this.dimentions = dimentions;
 		this.coordinates = coordinates;
@@ -53,7 +114,7 @@ Tetris = function(){
 
 		var selfFigure = this;
 
-		this.initArray = function(){
+		this.initArray = function(afterInitCb = function(){}){
 
 			// Logger.log("Matrix init", selfFigure)
 
@@ -62,20 +123,19 @@ Tetris = function(){
 					selfFigure.array[i] = {};
 				}
 
-				var color = empty ? "#FFFFFF" : (Random.getRandomBool() ? "#FFFFFF" : selfFigure.getColor());
-
-				selfFigure.array[i][j] = new selfTetris.Cell(color, [i, j]);
+				if (!selfFigure.array[i][j]) {
+					var color = selfFigure.isMatrix ? "#FFFFFF" : (Random.getRandomBool() ? "#FFFFFF" : selfFigure.getColor());
+					selfFigure.array[i][j] = new selfTetris.Cell(color, [i, j]);
+				}
 			});			
 
 			var weight = selfFigure.arrayReview().weight;
 
-			if (weight == 0 && !empty) {
-				selfFigure.initArray();
+			if (weight == 0 && !selfFigure.isMatrix) {
+				selfFigure.array[0][0] = new selfTetris.Cell(selfFigure.getColor(), [0, 0]);
 			}
 
-			// Logger.log("Matrix creation end", selfFigure)
-
-			cb();
+			afterInitCb();
 		}
 
 		this.arrayReview = function(cb = function(i,j){}, options = {}) {
@@ -202,11 +262,13 @@ Tetris = function(){
 			return selfFigure.directions.down;
 		}
 
-		this.initArray();
+		this.initArray(this.finallyCb ? this.finallyCb : function(){});
 	}
 
-	this.Matrix = function(dimentions, coordinates, colors, cellSize, figureOptions) {
+	this.Matrix = function(dimentions, coordinates, colors, figureOptions) {
+		this.isMatrix = true;
 		this.fallingFigures = [];
+		this.figureOptions = figureOptions;
 
 		this.gameOver = new Event("gameOver");
 		this.emptyFigures = new Event("emptyFigures");
@@ -215,12 +277,12 @@ Tetris = function(){
 		var selfMatrix = this;
 
 		this.createFigure = function() {
-			var center = Random.getRandomCenter(selfMatrix, figureOptions.dimentions);
-			var figure = new selfTetris.Figure(figureOptions.dimentions, center, [], cellSize, false, function(){}, selfMatrix);
+			var center = Random.getRandomCenter(selfMatrix, selfMatrix.figureOptions.dimentions);
+			var figure = new selfTetris.Figure(selfMatrix.figureOptions.dimentions, center, [], false, selfMatrix);
 
 			selfMatrix.fallingFigures.push(figure);
 
-			Logger.log("Matrix", selfMatrix.array);
+			// Logger.log("Matrix", selfMatrix.array);
 
 			return figure;
 		}
@@ -277,16 +339,24 @@ Tetris = function(){
 			}
 		}
 
+		document.addEventListener("changeFigureOptions", function(e){
+			selfMatrix.figureOptions.dimentions = e.detail.dimentions;
+			selfMatrix.initArray();
+		})
+
+		this.finallyCb = function() {
+			document.dispatchEvent(selfMatrix.matrixReady);
+		}
+
 		this.base = selfTetris.Figure;
-  		this.base(dimentions, coordinates, colors, cellSize, true, function(){
-  			document.dispatchEvent(selfMatrix.matrixReady);
-  		});
+  		this.base(dimentions, coordinates, colors, true);
 	}
 
 	this.Matrix.prototype = Object.create(this.Figure.prototype);
 	this.Matrix.prototype.constructor = this.Figure;
 
 	this.BaseAlgorithm = function(options = {}) {
+		this.timers = [];
 		this.gameTime = 0;
 		this.gravitationAngle = 0;
 		this.options = options;
@@ -313,44 +383,70 @@ Tetris = function(){
 		this.createGame = function() {
 			var figureOptions = {
 				dimentions: options.figureDimentions
-			}, interval;
+			}, interval, speed = selfBaseAlgorithm.options.speed;
+
+			var changeSpeed = function() {
+				speed = selfBaseAlgorithm.options.speed;
+				clearInterval(interval);
+				setTimer();
+			}
+
+			var setTimer = function() {
+				interval = setInterval(function(){
+					if (selfBaseAlgorithm.options.speed != speed) {
+						changeSpeed();
+					} else {
+						selfBaseAlgorithm.timerTick();
+					}
+				}, speed);
+			}
 
 			document.addEventListener("matrixReady", function(){
-				interval = setInterval(function(){
-					selfBaseAlgorithm.timerTick();
-				}, selfBaseAlgorithm.options.speed);
+				setTimer()
+			});
+
+			document.addEventListener("more", function(e){
+				selfBaseAlgorithm.matrix.createFigure();
+			});
+				
+			document.addEventListener("stopTicks", function(){
+				clearInterval(interval);
+				selfBaseAlgorithm.matrix = null;
 			});
 				
 			document.addEventListener("gameOver", function(){
 				clearInterval(interval);
-				Logger.log("Game Over", selfBaseAlgorithm.matrix)
+				// Logger.log("Game Over", selfBaseAlgorithm.matrix)
 			});
 				
 			document.addEventListener("emptyFigures", function(){
 				selfBaseAlgorithm.matrix.createFigure();
 			});
 
-			selfBaseAlgorithm.matrix = new selfTetris.Matrix(options.matrixDimentions, [0,0], [], options.cellSize, figureOptions);
+			selfBaseAlgorithm.matrix = new selfTetris.Matrix(options.matrixDimentions, [0,0], [], figureOptions);
 		}
 	}
 
 	this.canvas = document.getElementById("canvas");
 
-	this.drawBoard = function(matrix){	
+	this.drawBoard = function(matrix, cellSize){
+
+
 		var ctx = selfTetris.canvas.getContext("2d");
 
-		ctx.canvas.width = matrix.dimentions[0] * matrix.cellSize;
-		ctx.canvas.height = matrix.dimentions[1] * matrix.cellSize;
+		ctx.canvas.width = matrix.dimentions[0] * cellSize;
+		ctx.canvas.height = matrix.dimentions[1] * cellSize;
 
 	    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
+
 	    matrix.arrayReview(function(x, y){
 
-	    	var xx = x * matrix.cellSize;
-	    	var yy = y * matrix.cellSize
+	    	var xx = x * cellSize;
+	    	var yy = y * cellSize
 
-	    	var width = matrix.cellSize - 2;
-	    	var height = matrix.cellSize - 2;
+	    	var width = cellSize - 2;
+	    	var height = cellSize - 2;
 
 			ctx.fillStyle = "green";
 
@@ -363,11 +459,11 @@ Tetris = function(){
 
 	    for (var fi of matrix.fallingFigures) {
 	    	fi.arrayReview(function(x, y){
-	    		var xx = (fi.coordinates[0] + x) * matrix.cellSize;
-		    	var yy = (fi.coordinates[1] + y) * matrix.cellSize
+	    		var xx = (fi.coordinates[0] + x) * cellSize;
+		    	var yy = (fi.coordinates[1] + y) * cellSize
 
-		    	var width = matrix.cellSize - 2;
-		    	var height = matrix.cellSize - 2;		
+		    	var width = cellSize - 2;
+		    	var height = cellSize - 2;		
 		    	
 				ctx.fillStyle = "green";
 
@@ -380,21 +476,54 @@ Tetris = function(){
 	    }
 	}
 
-	this.init = function(){
+	this.init = function(speed, matrixDimentions, figureDimentions, cellSize){
 		var options = {
-			speed: 100,
-			matrixDimentions: [30,50],
-			figureDimentions: [3,2],
-			cellSize: 9
-		};
+			speed: speed,
+			matrixDimentions: matrixDimentions,
+			figureDimentions: figureDimentions
+		}, cellSize = cellSize;
 
-		var ba = new selfTetris.BaseAlgorithm(options);
-		ba.createGame();
+		selfTetris.ba = new selfTetris.BaseAlgorithm(options);
+		selfTetris.ba.createGame();		
+
+		document.addEventListener("changeCellSize", function(e){			
+			cellSize = e.detail.cellSize;
+		})
 
 		document.addEventListener("draw", function(){
-			selfTetris.drawBoard(ba.matrix);
+			selfTetris.drawBoard(selfTetris.ba.matrix, cellSize);
 		});
 	}
 
-	this.init();
+	this.setSpeed = function(speed) {
+		selfTetris.ba.options.speed = speed;
+	}
+
+	this.setFigureSizes = function(figureSizes) {
+		var e = new CustomEvent("changeFigureOptions", {detail: {
+			dimentions: figureSizes
+		}});
+
+		document.dispatchEvent(e)
+	}
+
+	this.setCellSize = function(cellSize) {
+		var e = new CustomEvent("changeCellSize", {detail: {
+			cellSize: cellSize
+		}});
+
+		document.dispatchEvent(e)
+	}
+
+	this.stop = function(){
+		var e = new CustomEvent("stopTicks");
+		document.dispatchEvent(e)
+	}
+
+	this.more = function(number){
+		var e = new CustomEvent("more");
+		document.dispatchEvent(e)
+	}
+
+	this.init(speed, matrixSize, figureSize, cellSize);
 }
